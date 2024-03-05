@@ -7,6 +7,7 @@
 - Python 3.x
 - MediaPipe library
 - OpenCv
+- PyAutoGUI
 
 <h2>🛠️ Installation Steps:</h2>
 
