@@ -9,6 +9,7 @@ mp_hands = mp.solutions.hands
 # importing the drawing utils of mediapipe, this will help us to show the hand landmarks on the screen
 mp_drawing = mp.solutions.drawing_utils
 
+# current screen resolution width and height
 screen_width, screen_height = pyautogui.size()
 
 # capture the camera
@@ -38,6 +39,12 @@ with mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.5,
 
         # process the frame and detect the hands
         output = hands.process(rgb_frame)
+        
+        # start_point = (0,0)
+        # end_point = (50, 50)
+        # color = (0,0,255)
+        # thickness = 5
+        # cv2.rectangle(img=rgb_frame, start_point=start_point, end_point=end_point, color=color, thickness=thickness)
 
         # if hand detected
         if output.multi_hand_landmarks:
@@ -56,7 +63,7 @@ with mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.5,
                         cv2.circle(img=rgb_frame, center=(x, y),
                                    radius=15, color=(255, 255, 0), thickness=2)
                         pyautogui.moveTo(x, y)
-
+                    
          # convert the flipped frame back to BGR before displaying
         bgr_frame_flipped = cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2BGR)
         cv2.imshow("AI Virtual Mouse", bgr_frame_flipped)
