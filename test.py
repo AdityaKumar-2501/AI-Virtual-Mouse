@@ -1,73 +1,73 @@
+import mediapipe as mp
 import cv2
-import numpy as np
-import HandTrackingModule as htm
-import time
-import autopy
+import pyautogui
 
-##########################
-wCam, hCam = 640, 480
-frameR = 100  # Frame Reduction
-smoothening = 7
-#########################
 
-pTime = 0
-plocX, plocY = 0, 0
-clocX, clocY = 0, 0
+# importing the hands landmarks solutions from mediapipe
+mp_hands = mp.solutions.hands
+# importing the drawing utils of mediapipe, this will help us to show the hand landmarks on the screen
+mp_drawing = mp.solutions.drawing_utils
 
-cap = cv2.VideoCapture(1)
-cap.set(3, wCam)
-cap.set(4, hCam)
-detector = htm.handDetector(maxHands=1)
-wScr, hScr = autopy.screen.size()
-# print(wScr, hScr)
+# current screen resolution width and height
+screen_width, screen_height = pyautogui.size()
 
-while True:
-    # 1. Find hand Landmarks
-    success, img = cap.read()
-    img = detector.findHands(img)
-    lmList, bbox = detector.findPosition(img)
-    # 2. Get the tip of the index and middle fingers
-    if len(lmList) != 0:
-        x1, y1 = lmList[8][1:]
-        x2, y2 = lmList[12][1:]
-        # print(x1, y1, x2, y2)
+# capture the camera
+cam = cv2.VideoCapture(0)
 
-    # 3. Check which fingers are up
-    fingers = detector.fingersUp()
-    # print(fingers)
-    cv2.rectangle(img, (frameR, frameR), (wCam - frameR, hCam - frameR),
-                  (255, 0, 255), 2)
-    # 4. Only Index Finger : Moving Mode
-    if fingers[1] == 1 and fingers[2] == 0:
-        # 5. Convert Coordinates
-        x3 = np.interp(x1, (frameR, wCam - frameR), (0, wScr))
-        y3 = np.interp(y1, (frameR, hCam - frameR), (0, hScr))
-        # 6. Smoothen Values
-        clocX = plocX + (x3 - plocX) / smoothening
-        clocY = plocY + (y3 - plocY) / smoothening
+# open the hand detection module with three parameters:
+#   max_num_hand: track only given no. of hands on screen at a time
+#   min_detection_confidence: show hand landmarks only when the confidence is more than 50%
+#   min_tracking_confidence: track hands only when the confidence is more than 50%
+with mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.5,
+                    min_tracking_confidence=0.5) as hands:
+    # starts the camera
+    while True:
+        success, frame = cam.read()
+        if not success:
+            print("Cannot detect camera")
+            break
 
-        # 7. Move Mouse
-        autopy.mouse.move(wScr - clocX, clocY)
-        cv2.circle(img, (x1, y1), 15, (255, 0, 255), cv2.FILLED)
-        plocX, plocY = clocX, clocY
+        # getting the frame width and height
+        frame_height, frame_width, _ = frame.shape
 
-    # 8. Both Index and middle fingers are up : Clicking Mode
-    if fingers[1] == 1 and fingers[2] == 1:
-        # 9. Find distance between fingers
-        length, img, lineInfo = detector.findDistance(8, 12, img)
-        print(length)
-        # 10. Click mouse if distance short
-        if length < 40:
-            cv2.circle(img, (lineInfo[4], lineInfo[5]),
-                       15, (0, 255, 0), cv2.FILLED)
-            autopy.mouse.click()
+        # opencv follows BGR format but mediapipe follows RGB format so convert it BGR to RBG
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-    # 11. Frame Rate
-    cTime = time.time()
-    fps = 1 / (cTime - pTime)
-    pTime = cTime
-    cv2.putText(img, str(int(fps)), (20, 50), cv2.FONT_HERSHEY_PLAIN, 3,
-                (255, 0, 0), 3)
-    # 12. Display
-    cv2.imshow("Image", img)
-    cv2.waitKey(1)
+        # Flip the frame by y-axis
+        rgb_frame = cv2.flip(rgb_frame, 1)
+
+        # process the frame and detect the hands
+        output = hands.process(rgb_frame)
+        
+        # start_point = (0,0)
+        # end_point = (50, 50)
+        # color = (0,0,255)
+        # thickness = 5
+        # cv2.rectangle(img=rgb_frame, start_point=start_point, end_point=end_point, color=color, thickness=thickness)
+
+        # if hand detected
+        if output.multi_hand_landmarks:
+            for hand_landmarks in output.multi_hand_landmarks:
+                # show the hand landmarks
+                mp_drawing.draw_landmarks(
+                    rgb_frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+
+                # getting the landmarks of hand
+                landmarks = hand_landmarks.landmark
+                for id, landmark in enumerate(landmarks):
+                    x = int(landmark.x * frame_width)
+                    y = int(landmark.y * frame_height)
+
+                    if id == 8:
+                        cv2.circle(img=rgb_frame, center=(x, y),
+                                   radius=15, color=(255, 255, 0), thickness=2)
+                        pyautogui.moveTo(x, y)
+                    
+         # convert the flipped frame back to BGR before displaying
+        bgr_frame_flipped = cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2BGR)
+        cv2.imshow("AI Virtual Mouse", bgr_frame_flipped)
+        if cv2.waitKey(1) == ord('q'):
+            break
+
+cam.release()
+cv2.destroyAllWindows()
